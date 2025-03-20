@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор QR-кодов</title>
+    <style>
+        body {
+            background-image: url('z_xehrf.jpg');
+            font-family: 'Arial', sans-serif;
+            color: #eaeaea; /* Light text color */
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            text-align: center;
+            border: 2px solid #27ae60; /* Green border */
+            border-radius: 10px;
+            background: rgba(44, 44, 44, 0.7); /* Полупрозрачный тёмный фон */
+            backdrop-filter: blur(10px); /* Размытие фона */
+            -webkit-backdrop-filter: blur(10px); /* Поддержка для Safari */
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            color: #27ae60; /* Dota 2 green color */
+        }
+        .controls {
+            margin: 15px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .control-group {
+            margin: 10px 0;
+        }
+        label {
+            font-weight: bold;
+            color: #eaeaea; /* Light label color */
+        }
+        input[type="text"], input[type="number"], input[type="color"] {
+            padding: 10px;
+            border: 1px solid #27ae60; /* Green border */
+            border-radius: 5px;
+            width: calc(100% - 22px); /* Full width minus padding */
+            background: #444444; /* Dark input background */
+            color: #eaeaea; /* Light text color */
+        }
+        button {
+            background-color: #27ae60; /* Dota 2 green button */
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #219653; /* Darker green on hover */
+        }
+        canvas {
+            margin: 20px 0;
+            border: 2px solid #27ae60; /* Green border around canvas */
+            border-radius: 10px;
+            background: #222222; /* Dark background for canvas */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Генератор QR-кодов</h2>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Текст/URL:</label><br>
+                <input type="text" id="qrText" placeholder="Введите текст или URL">
+            </div>
+            
+            <div class="control-group">
+                <label>Основной цвет:</label>
+                <input type="color" id="qrColor" value="#000000">
+            </div>
+            
+            <div class="control-group">
+                <label>Градиент:</label>
+                <input type="checkbox" id="useGradient">
+                <input type="color" id="gradientColor" value="#ff0000">
+            </div>
+            
+            <div class="control-group">
+                <label>Размер QR-кода (пиксели):</label>
+                <input type="number" id="qrSize" value="300" min="100" max="1000" step="50">
+            </div>
+            
+            <div class="control-group">
+                <label>Логотип:</label>
+                <input type="file" id="logoFile" accept="image/*">
+            </div>
+            
+            <button onclick="generateQR()">Сгенерировать QR-код</button>
+            <button onclick="saveQR()">Сохранить QR-код</button>
+        </div>
+        
+        <canvas id="qrCanvas"></canvas>
+    </div>
+
+    <!-- Подключаем QRious -->
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <script>
+        window.onload = function() {
+            if (typeof QRious === 'undefined') {
+                console.error('QRious library not loaded.');
+                alert('Ошибка: Библиотека QRious не загрузилась.');
+                return;
+            }
+            generateQR();
+            document.getElementById('logoFile').addEventListener('change', generateQR);
+        };
+
+        async function generateQR() {
+            const canvas = document.getElementById('qrCanvas');
+            const ctx = canvas.getContext('2d');
+            const text = document.getElementById('qrText').value || "https://example.com";
+            const color = document.getElementById('qrColor').value;
+            const useGradient = document.getElementById('useGradient').checked;
+            const gradientColor = document.getElementById('gradientColor').value;
+            const size = parseInt(document.getElementById('qrSize').value) || 300;
+            const logoFile = document.getElementById('logoFile').files[0];
+
+            canvas.width = size;
+            canvas.height = size;
+            ctx.clearRect(0, 0, size, size);
+
+            // Создаём QR-код с помощью QRious
+            const qr = new QRious({
+                element: canvas,
+                value: text,
+                size: size,
+                foreground: useGradient ? "#000000" : color,
+                background: "#ffffff",
+                level: "H" // Высокий уровень коррекции ошибок
+            });
+
+            // Сохраняем QR-код в промежуточный canvas перед наложением градиента или логотипа
+            const qrCanvas = document.createElement('canvas');
+            qrCanvas.width = size;
+            qrCanvas.height = size;
+            const qrCtx = qrCanvas.getContext('2d');
+            qrCtx.drawImage(canvas, 0, 0);
+
+            // Применяем градиент
+            if (useGradient) {
+                const gradientCanvas = document.createElement('canvas');
+                gradientCanvas.width = size;
+                gradientCanvas.height = size;
+                const gradientCtx = gradientCanvas.getContext('2d');
+
+                gradientCtx.drawImage(qrCanvas, 0, 0);
+
+                const gradient = gradientCtx.createLinearGradient(0, 0, size, size);
+                gradient.addColorStop(0, color);
+                gradient.addColorStop(1, gradientColor);
+
+                const imageData = gradientCtx.getImageData(0, 0, size, size);
+                for (let i = 0; i < imageData.data.length; i += 4) {
+                    const r = imageData.data[i];
+                    const g = imageData.data[i + 1];
+                    const b = imageData.data[i + 2];
+                    if (r < 128 && g < 128 && b < 128) { // Тёмные пиксели
+                        gradientCtx.fillStyle = gradient;
+                        gradientCtx.fillRect((i / 4) % size, Math.floor((i / 4) / size), 1, 1);
+                    }
+                }
+
+                ctx.clearRect(0, 0, size, size);
+                ctx.drawImage(gradientCanvas, 0, 0);
+            } else {
+                ctx.drawImage(qrCanvas, 0, 0); // Если градиента нет, просто копируем QR-код
+            }
+
+            // Добавляем логотип с адаптивной подложкой
+            if (logoFile) {
+                try {
+                    const logo = await loadImageFromFile(logoFile);
+                    const logoCanvas = document.createElement('canvas');
+                    const logoCtx = logoCanvas.getContext('2d');
+
+                    // Устанавливаем размер логотипа
+                    const maxLogoSize = size * 0.2; // 20% от размера QR-кода
+                    let logoWidth = logo.width;
+                    let logoHeight = logo.height;
+                    const aspectRatio = logoWidth / logoHeight;
+
+                    if (logoWidth > logoHeight) {
+                        logoWidth = Math.min(maxLogoSize, logo.width);
+                        logoHeight = logoWidth / aspectRatio;
+                    } else {
+                        logoHeight = Math.min(maxLogoSize, logo.height);
+                        logoWidth = logoHeight * aspectRatio;
+                    }
+
+                    logoCanvas.width = logoWidth;
+                    logoCanvas.height = logoHeight;
+                    logoCtx.drawImage(logo, 0, 0, logoWidth, logoHeight);
+
+                    // Позиция логотипа
+                    const logoPosX = (size - logoWidth) / 2;
+                    const logoPosY = (size - logoHeight) / 2;
+
+                    // Создаём полупрозрачную подложку, адаптированную к QR-коду
+                    const logoArea = ctx.getImageData(logoPosX, logoPosY, logoWidth, logoHeight);
+                    ctx.fillStyle = "rgba(255, 255, 255, 0)"; // Полупрозрачный белый
+                    ctx.fillRect(logoPosX, logoPosY, logoWidth, logoHeight);
+
+                    // Рисуем логотип поверх подложки
+                    ctx.drawImage(logoCanvas, logoPosX, logoPosY);
+                } catch (error) {
+                    console.error('Ошибка загрузки или обработки логотипа:', error);
+                }
+            }
+        }
+
+        function saveQR() {
+            const canvas = document.getElementById('qrCanvas');
+            const link = document.createElement('a');
+            link.download = 'qr-code.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function loadImageFromFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = event.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+    </script>
+</body>
+</html>
